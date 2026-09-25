@@ -116,9 +116,9 @@
     </div>
 
     <div class="card hint">
-      Keep the barcode flat and fill most of the scan box. For small or dense
-      medical-device labels, move closer and hold steady. You can also switch
-      to image/file scanning from the scanner controls when available.
+      Keep the barcode flat and let the entire barcode fill most of the camera frame.
+      For long 1D medical-device labels, hold the phone parallel to the label,
+      use bright even lighting, and move closer until the bars are sharp.
     </div>
 
   </div>
@@ -254,44 +254,95 @@
     );
   }
 
-  const formatsToSupport = [
-    Html5QrcodeSupportedFormats.QR_CODE,
-    Html5QrcodeSupportedFormats.AZTEC,
-    Html5QrcodeSupportedFormats.CODABAR,
-    Html5QrcodeSupportedFormats.CODE_39,
-    Html5QrcodeSupportedFormats.CODE_93,
-    Html5QrcodeSupportedFormats.CODE_128,
-    Html5QrcodeSupportedFormats.DATA_MATRIX,
-    Html5QrcodeSupportedFormats.ITF,
-    Html5QrcodeSupportedFormats.EAN_13,
-    Html5QrcodeSupportedFormats.EAN_8,
-    Html5QrcodeSupportedFormats.PDF_417,
-    Html5QrcodeSupportedFormats.UPC_A,
-    Html5QrcodeSupportedFormats.UPC_E
-  ];
+  const html5QrCode = new Html5Qrcode("reader", true);
 
-  const scanner = new Html5QrcodeScanner(
-    'reader',
-    {
-      fps: 12,
-      qrbox: function(viewfinderWidth, viewfinderHeight) {
-        return {
-          width: Math.floor(viewfinderWidth * 0.90),
-          height: Math.max(120, Math.floor(viewfinderHeight * 0.38))
-        };
-      },
-      rememberLastUsedCamera: true,
-      showTorchButtonIfSupported: true,
-      supportedScanTypes: [
-        Html5QrcodeScanType.SCAN_TYPE_CAMERA,
-        Html5QrcodeScanType.SCAN_TYPE_FILE
-      ],
-      formatsToSupport: formatsToSupport
-    },
-    false
-  );
+  const scanConfig = {
+    fps: 15,
+    aspectRatio: 1.777778,
+    disableFlip: true
+  };
 
-  scanner.render(onScanSuccess, onScanFailure);
+  async function startScanner() {
+    try {
+      /*
+        First preference: physical rear camera.
+        Do not constrain barcode formats and do not use qrbox.
+        That lets html5-qrcode use its full supported decoder set
+        across the entire camera frame.
+      */
+      await html5QrCode.start(
+        { facingMode: { exact: "environment" } },
+        scanConfig,
+        onScanSuccess,
+        onScanFailure
+      );
+
+      setStatus(
+        connectedMode ? "Connected to UMS dashboard" : "Scanner test mode",
+        "Rear camera active. Let the barcode fill most of the frame and hold steady.",
+        connectedMode ? "ok" : "warn"
+      );
+
+      return;
+    } catch (errExact) {
+      console.warn("Exact rear camera failed, trying ideal rear camera:", errExact);
+    }
+
+    try {
+      await html5QrCode.start(
+        { facingMode: "environment" },
+        scanConfig,
+        onScanSuccess,
+        onScanFailure
+      );
+
+      setStatus(
+        connectedMode ? "Connected to UMS dashboard" : "Scanner test mode",
+        "Rear camera active. Let the barcode fill most of the frame and hold steady.",
+        connectedMode ? "ok" : "warn"
+      );
+
+      return;
+    } catch (errIdeal) {
+      console.warn("Ideal rear camera failed, trying first available camera:", errIdeal);
+    }
+
+    try {
+      const devices = await Html5Qrcode.getCameras();
+
+      if (!devices || !devices.length) {
+        throw new Error("No camera devices found.");
+      }
+
+      let preferred = devices.find(d =>
+        /back|rear|environment/i.test(d.label || "")
+      ) || devices[devices.length - 1];
+
+      await html5QrCode.start(
+        preferred.id,
+        scanConfig,
+        onScanSuccess,
+        onScanFailure
+      );
+
+      setStatus(
+        connectedMode ? "Connected to UMS dashboard" : "Scanner test mode",
+        "Camera active. Let the barcode fill most of the frame and hold steady.",
+        connectedMode ? "ok" : "warn"
+      );
+
+    } catch (err) {
+      console.error("Unable to start scanner:", err);
+
+      setStatus(
+        "Unable to start barcode scanner",
+        String(err && err.message ? err.message : err),
+        "bad"
+      );
+    }
+  }
+
+  startScanner();
 </script>
 
 </body>
