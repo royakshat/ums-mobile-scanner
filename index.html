@@ -4,419 +4,349 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0f766e">
-  <title>UMS Mobile Scanner</title>
-
-  <script src="https://cdn.jsdelivr.net/npm/@taluks/html5-qrcode@2.4.0/minified/html5-qrcode.min.js" type="text/javascript"></script>
-
+  <title>UMS Barcode Scanner</title>
   <style>
-    *{box-sizing:border-box}
-    body{
-      margin:0;
-      font-family:Arial,Helvetica,sans-serif;
-      background:#f4f7f7;
-      color:#17313a;
-    }
-    .wrap{
-      width:min(100%,560px);
-      margin:0 auto;
-      padding:16px;
-    }
-    .brand{
-      background:#0f766e;
-      color:white;
-      border-radius:14px;
-      padding:16px;
-      margin-bottom:12px;
-    }
-    .brand h1{
-      margin:0;
-      font-size:21px;
-    }
-    .brand div{
-      opacity:.9;
-      font-size:13px;
-      margin-top:4px;
-    }
-    .card{
-      background:white;
-      border:1px solid #d9e3e3;
-      border-radius:14px;
-      padding:14px;
-      margin-bottom:12px;
-      box-shadow:0 2px 8px rgba(0,0,0,.04);
-    }
-    #reader{
-      width:100%;
-      overflow:hidden;
-      border-radius:12px;
-    }
-    #status{
-      font-weight:700;
-      line-height:1.35;
-    }
-    #detail{
-      font-size:13px;
-      color:#597078;
-      margin-top:6px;
-      word-break:break-word;
-    }
-    .ok{border-left:5px solid #0f766e}
-    .warn{border-left:5px solid #d97706}
-    .bad{border-left:5px solid #b91c1c}
-    .raw{
-      margin-top:10px;
-      background:#f5f7f8;
-      border-radius:8px;
-      padding:10px;
-      font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
-      font-size:14px;
-      word-break:break-all;
-      display:none;
-    }
-    button{
-      width:100%;
-      border:0;
-      border-radius:10px;
-      padding:12px 14px;
-      font-weight:700;
-      font-size:15px;
-      cursor:pointer;
-    }
-    .again{
-      background:#0f766e;
-      color:white;
-      margin-top:10px;
-      display:none;
-    }
-    .hint{
-      font-size:12px;
-      color:#61747b;
-      line-height:1.45;
-    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:system-ui,Arial,sans-serif;background:#f4f7f7;color:#17313a;min-height:100dvh}
+    .wrap{width:min(100%,540px);margin:0 auto;padding:16px;padding-bottom:40px}
+    .brand{background:#0f766e;color:#fff;border-radius:14px;padding:16px 18px;margin-bottom:12px}
+    .brand h1{font-size:20px;font-weight:700}
+    .brand p{font-size:13px;opacity:.9;margin-top:4px}
+    .card{background:#fff;border:1px solid #d4e2e0;border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+    h2{font-size:14px;font-weight:700;margin-bottom:10px;color:#17313a}
+    /* Video viewfinder */
+    #viewfinder-wrap{position:relative;background:#000;border-radius:10px;overflow:hidden;width:100%;aspect-ratio:4/3}
+    #viewfinder{width:100%;height:100%;object-fit:cover;display:block}
+    #aim-line{position:absolute;left:5%;right:5%;top:50%;height:2px;background:rgba(15,118,110,.8);box-shadow:0 0 6px rgba(15,118,110,.6);pointer-events:none}
+    #aim-label{position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:11px;color:rgba(255,255,255,.8);letter-spacing:.3px}
+    /* Buttons */
+    .btn{display:block;width:100%;border:none;border-radius:10px;padding:13px 16px;font-size:15px;font-weight:700;cursor:pointer;text-align:center;transition:opacity .15s}
+    .btn:disabled{opacity:.45;cursor:default}
+    .btn-teal{background:#0f766e;color:#fff;margin-bottom:8px}
+    .btn-dark{background:#17313a;color:#fff;margin-bottom:8px}
+    .btn-outline{background:transparent;color:#0f766e;border:2px solid #0f766e}
+    /* Status */
+    #status-card{border-left:5px solid #0f766e}
+    #status-card.warn{border-left-color:#d97706}
+    #status-card.bad{border-left-color:#b91c1c}
+    #status-card.ok{border-left-color:#0f766e}
+    #status-title{font-weight:700;font-size:15px;margin-bottom:4px}
+    #status-detail{font-size:13px;color:#597078;line-height:1.45}
+    #raw-value{margin-top:10px;padding:10px 12px;background:#f0f5f5;border-radius:8px;font-family:monospace;font-size:14px;word-break:break-all;display:none}
+    .hint{font-size:12px;color:#61747b;line-height:1.5}
+    /* Manual input */
+    #manual-input{width:100%;border:1px solid #d4e2e0;border-radius:8px;padding:10px 12px;font-size:14px;margin-bottom:8px}
+    #manual-input:focus{outline:2px solid #0f766e;border-color:#0f766e}
+    /* Spinner */
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .spin{width:20px;height:20px;border:3px solid #d4e2e0;border-top-color:#0f766e;border-radius:50%;animation:spin .8s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px}
   </style>
 </head>
-
 <body>
-  <div class="wrap">
+<div class="wrap">
 
-    <div class="brand">
-      <h1>UniversalMed Supply</h1>
-      <div>Mobile Barcode Scanner</div>
-    </div>
-
-    <div class="card">
-      <div id="reader"></div>
-
-      <div style="margin-top:10px">
-        <label for="barcodeFile" style="
-          display:block;
-          width:100%;
-          padding:12px 14px;
-          border-radius:10px;
-          background:#17313a;
-          color:#fff;
-          font-weight:700;
-          text-align:center;
-          cursor:pointer;">
-          Take Photo / Choose Barcode Image
-        </label>
-        <input
-          id="barcodeFile"
-          type="file"
-          accept="image/*"
-          capture="environment"
-          style="display:none">
-      </div>
-    </div>
-
-    <div id="statusCard" class="card ok">
-      <div id="status">Starting scanner...</div>
-      <div id="detail">Allow camera access when your phone asks.</div>
-      <div id="raw" class="raw"></div>
-      <button id="again" class="again" type="button" onclick="resetForAnotherScan()">Scan another barcode</button>
-    </div>
-
-    <div class="card hint">
-      Keep the barcode flat and let the entire barcode fill most of the camera frame.
-      For difficult DME/GS1 labels, use Take Photo / Choose Barcode Image — a sharp
-      full-resolution still image is often easier to decode than a live video frame.
-    </div>
-
+  <div class="brand">
+    <h1>UniversalMed Supply</h1>
+    <p>Mobile Barcode Scanner — point camera at any barcode</p>
   </div>
 
+  <!-- Live camera -->
+  <div class="card">
+    <h2>Live camera scanner</h2>
+    <div id="viewfinder-wrap">
+      <video id="viewfinder" autoplay muted playsinline></video>
+      <div id="aim-line"></div>
+      <div id="aim-label">Hold barcode steady along this line</div>
+    </div>
+    <div id="cam-status" style="font-size:12px;color:#597078;margin-top:8px;min-height:18px"></div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-teal" id="btn-stop-cam" onclick="stopCamera()" style="display:none;flex:1">Stop camera</button>
+    </div>
+  </div>
+
+  <!-- Photo fallback — camera must be stopped first -->
+  <div class="card">
+    <h2>📷 Scan from photo <span style="font-size:11px;font-weight:400;color:#597078">(better for dense / small barcodes)</span></h2>
+    <p style="font-size:12px;color:#597078;margin-bottom:10px">
+      Tap the button, take a photo of the barcode, and it will be decoded from the full-resolution image.
+      Works best when the live camera can't lock on.
+    </p>
+    <label id="photo-btn" class="btn btn-dark" for="photo-input">Take photo / choose image</label>
+    <input id="photo-input" type="file" accept="image/*" capture="environment" style="display:none">
+    <div id="photo-status" style="font-size:12px;color:#597078;margin-top:6px;min-height:16px"></div>
+  </div>
+
+  <!-- Manual entry -->
+  <div class="card">
+    <h2>⌨ Type or paste barcode</h2>
+    <input id="manual-input" type="text" placeholder="e.g. 1090624 or MDR211892R" autocomplete="off"
+      onkeydown="if(event.key==='Enter'){event.preventDefault();submitManual();}">
+    <button class="btn btn-outline" onclick="submitManual()">Submit</button>
+  </div>
+
+  <!-- Status -->
+  <div class="card ok" id="status-card">
+    <div id="status-title">Starting scanner…</div>
+    <div id="status-detail">Camera will open automatically. Allow access if prompted.</div>
+    <div id="raw-value"></div>
+    <button class="btn btn-teal" id="btn-again" onclick="resetScanner()" style="display:none;margin-top:10px">Scan another barcode</button>
+  </div>
+
+  <div class="card hint">
+    <b>Tips for medical device labels:</b><br>
+    • For the <b>REF barcode</b> (under "REF" on the box): scan the narrow 1D barcode — it encodes the manufacturer item number.<br>
+    • For GS1-128 / Code 128 labels: keep the barcode level and let it fill most of the frame.<br>
+    • If live camera misses it, use <b>Take photo</b> — a sharp still is usually decoded correctly.<br>
+    • You can also type the number manually if the barcode is damaged.
+  </div>
+
+</div>
+
+<!--
+  ZXing Browser — best open-source 1D/2D decoder for medical barcodes.
+  Handles Code 128, Code 39, ITF, EAN-13, EAN-8, QR, DataMatrix, PDF417.
+-->
+<script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js"></script>
+<!--
+  ZXing Library (for decoding still images via BrowserMultiFormatReader)
+-->
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
+
 <script>
-  const qs = new URLSearchParams(window.location.search);
-  const sessionId = (qs.get('session') || '').trim();
-  const endpoint = (qs.get('endpoint') || '').trim();
+/* ---- Session params ---- */
+const qs = new URLSearchParams(window.location.search);
+const SESSION_ID = (qs.get('session') || '').trim();
+const ENDPOINT   = (qs.get('endpoint') || '').trim();
+const CONNECTED  = !!(SESSION_ID && ENDPOINT);
 
-  const connectedMode = !!(sessionId && endpoint);
-  let sent = false;
-  let lastValue = '';
-  let lastAt = 0;
+/* ---- State ---- */
+let codeReader   = null;   // ZXing continuous reader
+let sent         = false;
+let lastCode     = '';
+let lastAt       = 0;
+let cameraActive = false;
 
-  const statusEl = document.getElementById('status');
-  const detailEl = document.getElementById('detail');
-  const rawEl = document.getElementById('raw');
-  const statusCard = document.getElementById('statusCard');
-  const againBtn = document.getElementById('again');
+/* ---- DOM ---- */
+const statusCard   = document.getElementById('status-card');
+const statusTitle  = document.getElementById('status-title');
+const statusDetail = document.getElementById('status-detail');
+const rawValue     = document.getElementById('raw-value');
+const btnAgain     = document.getElementById('btn-again');
+const btnStopCam   = document.getElementById('btn-stop-cam');
+const camStatus    = document.getElementById('cam-status');
+const photoStatus  = document.getElementById('photo-status');
+const video        = document.getElementById('viewfinder');
 
-  function setStatus(title, detail, kind) {
-    statusEl.textContent = title || '';
-    detailEl.textContent = detail || '';
-    statusCard.className = 'card ' + (kind || 'ok');
+function setStatus(title, detail, kind) {
+  statusTitle.textContent  = title  || '';
+  statusDetail.textContent = detail || '';
+  statusCard.className     = 'card ' + (kind || 'ok');
+}
+
+/* ---- Decode & submit ---- */
+async function handleDecoded(text, fmt) {
+  text = String(text || '').trim();
+  if (!text) return;
+
+  /* Deduplicate within 3 seconds */
+  const now = Date.now();
+  if (text === lastCode && now - lastAt < 3000) return;
+  lastCode = text;
+  lastAt   = now;
+
+  rawValue.textContent  = text;
+  rawValue.style.display = 'block';
+
+  if (!CONNECTED) {
+    setStatus('Barcode decoded — test mode', text + (fmt ? '  [' + fmt + ']' : ''), 'ok');
+    btnAgain.style.display = 'block';
+    return;
   }
 
-  function formatName(decodedResult) {
-    try {
-      return decodedResult.result.format.formatName || 'Phone Camera';
-    } catch (e) {
-      return 'Phone Camera';
-    }
-  }
+  if (sent) return;
+  sent = true;
 
-  async function submitToDashboard(barcode, format) {
+  setStatus('Sending to dashboard…', text, 'ok');
+
+  try {
     const body = new URLSearchParams();
-    body.set('action', 'phoneScanSubmit');
-    body.set('sessionId', sessionId);
-    body.set('barcode', barcode);
-    body.set('format', format || 'Phone Camera');
+    body.set('action',    'phoneScanSubmit');
+    body.set('sessionId', SESSION_ID);
+    body.set('barcode',   text);
+    body.set('format',    fmt || 'Phone Camera');
 
-    /*
-      Apps Script ContentService redirects responses. no-cors intentionally
-      avoids requiring the GitHub page to read that cross-origin response.
-      The UMS dashboard is the source of truth: it polls the session and will
-      only continue when Apps Script actually stored the barcode.
-    */
-    await fetch(endpoint, {
-      method: 'POST',
-      mode: 'no-cors',
-      body: body
-    });
-  }
+    /* no-cors: Apps Script redirect means we can't read the response.
+       The dashboard polls separately. */
+    await fetch(ENDPOINT, { method: 'POST', mode: 'no-cors', body });
 
-  async function onScanSuccess(decodedText, decodedResult) {
-    const value = String(decodedText || '').trim();
-    if (!value) return;
-
-    const now = Date.now();
-    if (value === lastValue && now - lastAt < 2500) return;
-    lastValue = value;
-    lastAt = now;
-
-    const fmt = formatName(decodedResult);
-
-    rawEl.style.display = 'block';
-    rawEl.textContent = value;
-
-    if (!connectedMode) {
-      setStatus(
-        'Barcode decoded successfully',
-        'Test mode only. Open this scanner from the UMS dashboard to send the value back automatically.',
-        'ok'
-      );
-      againBtn.style.display = 'block';
-      return;
-    }
-
-    if (sent) return;
-    sent = true;
-
-    setStatus('Barcode detected', 'Sending it securely to the UMS dashboard...', 'ok');
-
-    try {
-      await submitToDashboard(value, fmt);
-      setStatus(
-        'Scan sent',
-        'Return to the UMS Inventory Dashboard. It will process this barcode using the existing item/GS1/traceability logic.',
-        'ok'
-      );
-      againBtn.style.display = 'none';
-    } catch (err) {
-      sent = false;
-      setStatus(
-        'Could not send the scan',
-        'Check your connection and open a new phone-scan session from the dashboard.',
-        'bad'
-      );
-      againBtn.style.display = 'block';
-    }
-  }
-
-  function onScanFailure() {
-    // Expected continuously while the camera is searching. Keep quiet.
-  }
-
-  function resetForAnotherScan() {
-    sent = false;
-    lastValue = '';
-    lastAt = 0;
-    rawEl.style.display = 'none';
-    rawEl.textContent = '';
-    againBtn.style.display = 'none';
-
-    if (connectedMode) {
-      setStatus(
-        'This session is one-time',
-        'Return to the UMS dashboard and tap Scan with phone again for a new secure session.',
-        'warn'
-      );
-    } else {
-      setStatus('Ready to scan', 'Point the rear camera at a barcode.', 'ok');
-    }
-  }
-
-  if (connectedMode) {
-    setStatus('Connected to UMS dashboard', 'Point the rear camera at a barcode.', 'ok');
-  } else {
     setStatus(
-      'Scanner test mode',
-      'Camera scanning works here, but no UMS dashboard session was supplied. A decoded value will only be shown on this page.',
+      '✓ Barcode sent to dashboard',
+      'Return to the UMS dashboard — it will look up "' + text + '" automatically.',
+      'ok'
+    );
+    btnAgain.style.display = 'none';
+  } catch (err) {
+    sent = false;
+    setStatus('Network error — could not send scan', String(err && err.message ? err.message : err), 'bad');
+    btnAgain.style.display = 'block';
+  }
+}
+
+/* ---- Camera (ZXing continuous) ---- */
+async function startCamera() {
+  try {
+    const hints = new Map();
+    /* Tell ZXing to try all 1D + 2D formats */
+    if (window.ZXingBrowser && window.ZXingBrowser.BrowserMultiFormatReader) {
+      codeReader = new ZXingBrowser.BrowserMultiFormatReader(hints, {
+        delayBetweenScanAttempts: 100,
+        delayBetweenScanSuccess:  1500
+      });
+    } else if (window.ZXing && window.ZXing.BrowserMultiFormatReader) {
+      codeReader = new ZXing.BrowserMultiFormatReader(hints, 100);
+    } else {
+      throw new Error('ZXing library did not load. Use photo scanning below.');
+    }
+
+    const devices = await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
+    /* Prefer rear camera */
+    const preferred = devices.find(d => /back|rear|environment/i.test(d.label || ''))
+                   || devices[devices.length - 1];
+
+    if (!preferred) throw new Error('No camera found on this device.');
+
+    await codeReader.decodeFromVideoDevice(
+      preferred.deviceId,
+      video,
+      (result, err) => {
+        if (result) {
+          const fmt = result.getBarcodeFormat
+            ? String(result.getBarcodeFormat()) : 'Camera';
+          handleDecoded(result.getText(), fmt);
+        }
+        /* err is normal — ZXing fires it when no barcode in frame */
+      }
+    );
+
+    cameraActive = true;
+    btnStopCam.style.display = 'block';
+    camStatus.textContent = 'Camera active — hold barcode along the green line.';
+    setStatus(
+      CONNECTED ? 'Connected — ready to scan' : 'Scanner ready (test mode)',
+      'Point the rear camera at a barcode. Hold steady.',
+      CONNECTED ? 'ok' : 'warn'
+    );
+
+  } catch (err) {
+    cameraActive = false;
+    camStatus.textContent = 'Camera error: ' + (err && err.message ? err.message : err);
+    setStatus(
+      'Camera not available',
+      'Use Take Photo or type the barcode manually below.',
       'warn'
     );
   }
+}
 
-  const html5QrCode = new Html5Qrcode("reader", {
-    verbose: true,
-    useBarCodeDetectorIfSupported: false,
-    zxingWasm: { loadMode: "cdn" }
-  });
+function stopCamera() {
+  try { if (codeReader) codeReader.reset(); } catch (e) {}
+  codeReader   = null;
+  cameraActive = false;
+  btnStopCam.style.display = 'none';
+  camStatus.textContent = 'Camera stopped. Use Take Photo or type below.';
+  /* Clear the video so it doesn't show a frozen frame */
+  if (video.srcObject) {
+    video.srcObject.getTracks().forEach(t => t.stop());
+    video.srcObject = null;
+  }
+}
 
-  const scanConfig = {
-    fps: 10,
-    disableFlip: false
-  };
+/* ---- Photo / file scan ---- */
+document.getElementById('photo-input').addEventListener('change', async function(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
 
-  async function startScanner() {
-    try {
-      /*
-        First preference: physical rear camera.
-        Do not constrain barcode formats and do not use qrbox.
-        That lets html5-qrcode use its full supported decoder set
-        across the entire camera frame.
-      */
-      await html5QrCode.start(
-        { facingMode: { exact: "environment" } },
-        scanConfig,
-        onScanSuccess,
-        onScanFailure
-      );
+  /* Stop live camera first — ZXing can't decode an image while streaming */
+  stopCamera();
 
-      setStatus(
-        connectedMode ? "Connected to UMS dashboard" : "Scanner test mode",
-        "Rear camera active. Let the barcode fill most of the frame and hold steady.",
-        connectedMode ? "ok" : "warn"
-      );
+  photoStatus.textContent = 'Reading barcode…';
+  setStatus('Reading barcode from photo…', 'Using full-resolution image decoder.', 'ok');
 
-      return;
-    } catch (errExact) {
-      console.warn("Exact rear camera failed, trying ideal rear camera:", errExact);
+  try {
+    let reader;
+    if (window.ZXingBrowser && window.ZXingBrowser.BrowserMultiFormatReader) {
+      reader = new ZXingBrowser.BrowserMultiFormatReader();
+    } else if (window.ZXing && window.ZXing.BrowserMultiFormatReader) {
+      reader = new ZXing.BrowserMultiFormatReader();
+    } else {
+      throw new Error('ZXing library not loaded');
     }
 
-    try {
-      await html5QrCode.start(
-        { facingMode: "environment" },
-        scanConfig,
-        onScanSuccess,
-        onScanFailure
-      );
+    /* Draw the image into an offscreen canvas for decoding */
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.src = url;
+    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
 
-      setStatus(
-        connectedMode ? "Connected to UMS dashboard" : "Scanner test mode",
-        "Rear camera active. Let the barcode fill most of the frame and hold steady.",
-        connectedMode ? "ok" : "warn"
-      );
+    const canvas = document.createElement('canvas');
+    canvas.width  = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
 
-      return;
-    } catch (errIdeal) {
-      console.warn("Ideal rear camera failed, trying first available camera:", errIdeal);
-    }
+    const result = await reader.decodeFromCanvas(canvas);
+    const fmt    = result.getBarcodeFormat ? String(result.getBarcodeFormat()) : 'Image';
+    photoStatus.textContent = 'Decoded: ' + result.getText();
+    handleDecoded(result.getText(), fmt);
 
-    try {
-      const devices = await Html5Qrcode.getCameras();
+  } catch (err) {
+    photoStatus.textContent = 'No barcode found. Try closer / sharper / less glare.';
+    setStatus(
+      'No barcode found in photo',
+      'Make sure the barcode fills most of the photo and is in focus. Try again or type the number manually.',
+      'warn'
+    );
+  } finally {
+    e.target.value = ''; /* allow re-selecting same file */
+  }
+});
 
-      if (!devices || !devices.length) {
-        throw new Error("No camera devices found.");
-      }
+/* ---- Manual entry ---- */
+function submitManual() {
+  const input = document.getElementById('manual-input');
+  const val   = (input.value || '').trim();
+  if (!val) { input.focus(); return; }
+  handleDecoded(val, 'Manual entry');
+  input.value = '';
+}
 
-      let preferred = devices.find(d =>
-        /back|rear|environment/i.test(d.label || "")
-      ) || devices[devices.length - 1];
+/* ---- Reset ---- */
+function resetScanner() {
+  sent          = false;
+  lastCode      = '';
+  lastAt        = 0;
+  rawValue.style.display  = 'none';
+  rawValue.textContent    = '';
+  btnAgain.style.display  = 'none';
+  photoStatus.textContent = '';
 
-      await html5QrCode.start(
-        preferred.id,
-        scanConfig,
-        onScanSuccess,
-        onScanFailure
-      );
-
-      setStatus(
-        connectedMode ? "Connected to UMS dashboard" : "Scanner test mode",
-        "Camera active. Let the barcode fill most of the frame and hold steady.",
-        connectedMode ? "ok" : "warn"
-      );
-
-    } catch (err) {
-      console.error("Unable to start scanner:", err);
-
-      setStatus(
-        "Unable to start barcode scanner",
-        String(err && err.message ? err.message : err),
-        "bad"
-      );
-    }
+  if (CONNECTED) {
+    setStatus('Ready to scan again', 'Point camera at a barcode or use Take Photo.', 'ok');
+  } else {
+    setStatus('Test mode — ready', 'No session — value will only show here.', 'warn');
   }
 
+  if (!cameraActive) startCamera();
+}
 
-  let scanFailureCount = 0;
-  const originalFailureHandler = onScanFailure;
+/* ---- Boot ---- */
+if (CONNECTED) {
+  setStatus('Connected to UMS dashboard', 'Starting camera…', 'ok');
+} else {
+  setStatus('Test mode', 'No session supplied. Decoded values will only show on this page.', 'warn');
+}
 
-  /*
-    Still-image decoding is important for dense DME/GS1 labels.
-    It uses the same ZXing-WASM decoder but on a sharp full-resolution photo.
-  */
-  document.getElementById("barcodeFile").addEventListener("change", async function(e) {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-
-    setStatus(
-      "Reading barcode image...",
-      "Using full-resolution ZXing-WASM decoding.",
-      "ok"
-    );
-
-    try {
-      const result = await html5QrCode.scanFile(file, true);
-      onScanSuccess(result, { result: { format: { formatName: "Image / ZXing-WASM" } } });
-    } catch (err) {
-      console.error("Image scan failed:", err);
-      setStatus(
-        "No barcode found in image",
-        "Try moving closer so one barcode fills most of the photo, keep it sharp, and avoid glare.",
-        "warn"
-      );
-    } finally {
-      e.target.value = "";
-    }
-  });
-
-  /*
-    Surface a diagnostic after many live decode misses so we know the camera
-    is running and frames are actually reaching the decoder.
-  */
-  onScanFailure = function(error) {
-    scanFailureCount++;
-    if (scanFailureCount === 30) {
-      detailEl.textContent =
-        "Camera and decoder are active, but no barcode has matched yet. " +
-        "Try a normal UPC/Code128 first, or use Take Photo / Choose Barcode Image.";
-    }
-    if (typeof originalFailureHandler === "function") {
-      originalFailureHandler(error);
-    }
-  };
-
-  startScanner();
+startCamera();
 </script>
-
 </body>
 </html>
