@@ -1,148 +1,297 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f766e">
   <title>UMS Mobile Scanner</title>
 
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 20px;
-      background: #f5f7f8;
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Arial,Helvetica,sans-serif;
+      background:#f4f7f7;
+      color:#17313a;
     }
-
-    .wrap {
-      max-width: 520px;
-      margin: auto;
+    .wrap{
+      width:min(100%,560px);
+      margin:0 auto;
+      padding:16px;
     }
-
-    #reader {
-      width: 100%;
-      background: white;
-      border-radius: 10px;
-      overflow: hidden;
+    .brand{
+      background:#0f766e;
+      color:white;
+      border-radius:14px;
+      padding:16px;
+      margin-bottom:12px;
     }
-
-    .status {
-      margin-top: 15px;
-      padding: 12px;
-      background: white;
-      border-radius: 8px;
+    .brand h1{
+      margin:0;
+      font-size:21px;
+    }
+    .brand div{
+      opacity:.9;
+      font-size:13px;
+      margin-top:4px;
+    }
+    .card{
+      background:white;
+      border:1px solid #d9e3e3;
+      border-radius:14px;
+      padding:14px;
+      margin-bottom:12px;
+      box-shadow:0 2px 8px rgba(0,0,0,.04);
+    }
+    #reader{
+      width:100%;
+      overflow:hidden;
+      border-radius:12px;
+    }
+    #status{
+      font-weight:700;
+      line-height:1.35;
+    }
+    #detail{
+      font-size:13px;
+      color:#597078;
+      margin-top:6px;
+      word-break:break-word;
+    }
+    .ok{border-left:5px solid #0f766e}
+    .warn{border-left:5px solid #d97706}
+    .bad{border-left:5px solid #b91c1c}
+    .raw{
+      margin-top:10px;
+      background:#f5f7f8;
+      border-radius:8px;
+      padding:10px;
+      font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+      font-size:14px;
+      word-break:break-all;
+      display:none;
+    }
+    button{
+      width:100%;
+      border:0;
+      border-radius:10px;
+      padding:12px 14px;
+      font-weight:700;
+      font-size:15px;
+      cursor:pointer;
+    }
+    .again{
+      background:#0f766e;
+      color:white;
+      margin-top:10px;
+      display:none;
+    }
+    .hint{
+      font-size:12px;
+      color:#61747b;
+      line-height:1.45;
     }
   </style>
 </head>
 
 <body>
-<div class="wrap">
+  <div class="wrap">
 
-  <h2>UMS Mobile Barcode Scanner</h2>
+    <div class="brand">
+      <h1>UniversalMed Supply</h1>
+      <div>Mobile Barcode Scanner</div>
+    </div>
 
-  <div id="reader"></div>
+    <div class="card">
+      <div id="reader"></div>
+    </div>
 
-  <div class="status" id="status">
-    Point the camera at a barcode.
+    <div id="statusCard" class="card ok">
+      <div id="status">Starting scanner...</div>
+      <div id="detail">Allow camera access when your phone asks.</div>
+      <div id="raw" class="raw"></div>
+      <button id="again" class="again" type="button" onclick="resetForAnotherScan()">Scan another barcode</button>
+    </div>
+
+    <div class="card hint">
+      Keep the barcode flat and fill most of the scan box. For small or dense
+      medical-device labels, move closer and hold steady. You can also switch
+      to image/file scanning from the scanner controls when available.
+    </div>
+
   </div>
 
-</div>
-
 <script>
+  const qs = new URLSearchParams(window.location.search);
+  const sessionId = (qs.get('session') || '').trim();
+  const endpoint = (qs.get('endpoint') || '').trim();
 
-const params = new URLSearchParams(window.location.search);
+  const connectedMode = !!(sessionId && endpoint);
+  let sent = false;
+  let lastValue = '';
+  let lastAt = 0;
 
-const sessionId = params.get("session");
-const endpoint = params.get("endpoint");
+  const statusEl = document.getElementById('status');
+  const detailEl = document.getElementById('detail');
+  const rawEl = document.getElementById('raw');
+  const statusCard = document.getElementById('statusCard');
+  const againBtn = document.getElementById('again');
 
-let alreadySending = false;
-
-async function sendBarcode(decodedText, decodedResult) {
-
-  if (alreadySending) return;
-
-  alreadySending = true;
-
-  document.getElementById("status").innerText =
-    "Barcode detected: " + decodedText;
-
-  const format =
-    decodedResult?.result?.format?.formatName ||
-    decodedResult?.decodedResult?.format ||
-    "UNKNOWN";
-
-  const payload = {
-    action: "submitScan",
-    sessionId: sessionId,
-    barcode: decodedText,
-    format: format
-  };
-
-  try {
-
-    await fetch(endpoint, {
-      method: "POST",
-      mode: "no-cors",
-      headers: {
-        "Content-Type": "text/plain"
-      },
-      body: JSON.stringify(payload)
-    });
-
-    document.getElementById("status").innerText =
-      "Scan sent successfully: " + decodedText;
-
-  } catch (err) {
-
-    document.getElementById("status").innerText =
-      "Unable to send scan.";
-
-    alreadySending = false;
-
+  function setStatus(title, detail, kind) {
+    statusEl.textContent = title || '';
+    detailEl.textContent = detail || '';
+    statusCard.className = 'card ' + (kind || 'ok');
   }
-}
 
-const formatsToSupport = [
-  Html5QrcodeSupportedFormats.CODE_128,
-  Html5QrcodeSupportedFormats.CODE_39,
-  Html5QrcodeSupportedFormats.CODE_93,
-  Html5QrcodeSupportedFormats.CODABAR,
-  Html5QrcodeSupportedFormats.ITF,
-  Html5QrcodeSupportedFormats.EAN_13,
-  Html5QrcodeSupportedFormats.EAN_8,
-  Html5QrcodeSupportedFormats.UPC_A,
-  Html5QrcodeSupportedFormats.UPC_E,
-  Html5QrcodeSupportedFormats.DATA_MATRIX,
-  Html5QrcodeSupportedFormats.PDF_417,
-  Html5QrcodeSupportedFormats.AZTEC,
-  Html5QrcodeSupportedFormats.QR_CODE
-];
+  function formatName(decodedResult) {
+    try {
+      return decodedResult.result.format.formatName || 'Phone Camera';
+    } catch (e) {
+      return 'Phone Camera';
+    }
+  }
 
-const scanner = new Html5QrcodeScanner(
-  "reader",
-  {
-    fps: 12,
+  async function submitToDashboard(barcode, format) {
+    const body = new URLSearchParams();
+    body.set('action', 'phoneScanSubmit');
+    body.set('sessionId', sessionId);
+    body.set('barcode', barcode);
+    body.set('format', format || 'Phone Camera');
 
-    qrbox: function(viewfinderWidth, viewfinderHeight) {
-      return {
-        width: Math.floor(viewfinderWidth * 0.9),
-        height: Math.floor(viewfinderHeight * 0.45)
-      };
+    /*
+      Apps Script ContentService redirects responses. no-cors intentionally
+      avoids requiring the GitHub page to read that cross-origin response.
+      The UMS dashboard is the source of truth: it polls the session and will
+      only continue when Apps Script actually stored the barcode.
+    */
+    await fetch(endpoint, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: body
+    });
+  }
+
+  async function onScanSuccess(decodedText, decodedResult) {
+    const value = String(decodedText || '').trim();
+    if (!value) return;
+
+    const now = Date.now();
+    if (value === lastValue && now - lastAt < 2500) return;
+    lastValue = value;
+    lastAt = now;
+
+    const fmt = formatName(decodedResult);
+
+    rawEl.style.display = 'block';
+    rawEl.textContent = value;
+
+    if (!connectedMode) {
+      setStatus(
+        'Barcode decoded successfully',
+        'Test mode only. Open this scanner from the UMS dashboard to send the value back automatically.',
+        'ok'
+      );
+      againBtn.style.display = 'block';
+      return;
+    }
+
+    if (sent) return;
+    sent = true;
+
+    setStatus('Barcode detected', 'Sending it securely to the UMS dashboard...', 'ok');
+
+    try {
+      await submitToDashboard(value, fmt);
+      setStatus(
+        'Scan sent',
+        'Return to the UMS Inventory Dashboard. It will process this barcode using the existing item/GS1/traceability logic.',
+        'ok'
+      );
+      againBtn.style.display = 'none';
+    } catch (err) {
+      sent = false;
+      setStatus(
+        'Could not send the scan',
+        'Check your connection and open a new phone-scan session from the dashboard.',
+        'bad'
+      );
+      againBtn.style.display = 'block';
+    }
+  }
+
+  function onScanFailure() {
+    // Expected continuously while the camera is searching. Keep quiet.
+  }
+
+  function resetForAnotherScan() {
+    sent = false;
+    lastValue = '';
+    lastAt = 0;
+    rawEl.style.display = 'none';
+    rawEl.textContent = '';
+    againBtn.style.display = 'none';
+
+    if (connectedMode) {
+      setStatus(
+        'This session is one-time',
+        'Return to the UMS dashboard and tap Scan with phone again for a new secure session.',
+        'warn'
+      );
+    } else {
+      setStatus('Ready to scan', 'Point the rear camera at a barcode.', 'ok');
+    }
+  }
+
+  if (connectedMode) {
+    setStatus('Connected to UMS dashboard', 'Point the rear camera at a barcode.', 'ok');
+  } else {
+    setStatus(
+      'Scanner test mode',
+      'Camera scanning works here, but no UMS dashboard session was supplied. A decoded value will only be shown on this page.',
+      'warn'
+    );
+  }
+
+  const formatsToSupport = [
+    Html5QrcodeSupportedFormats.QR_CODE,
+    Html5QrcodeSupportedFormats.AZTEC,
+    Html5QrcodeSupportedFormats.CODABAR,
+    Html5QrcodeSupportedFormats.CODE_39,
+    Html5QrcodeSupportedFormats.CODE_93,
+    Html5QrcodeSupportedFormats.CODE_128,
+    Html5QrcodeSupportedFormats.DATA_MATRIX,
+    Html5QrcodeSupportedFormats.ITF,
+    Html5QrcodeSupportedFormats.EAN_13,
+    Html5QrcodeSupportedFormats.EAN_8,
+    Html5QrcodeSupportedFormats.PDF_417,
+    Html5QrcodeSupportedFormats.UPC_A,
+    Html5QrcodeSupportedFormats.UPC_E
+  ];
+
+  const scanner = new Html5QrcodeScanner(
+    'reader',
+    {
+      fps: 12,
+      qrbox: function(viewfinderWidth, viewfinderHeight) {
+        return {
+          width: Math.floor(viewfinderWidth * 0.90),
+          height: Math.max(120, Math.floor(viewfinderHeight * 0.38))
+        };
+      },
+      rememberLastUsedCamera: true,
+      showTorchButtonIfSupported: true,
+      supportedScanTypes: [
+        Html5QrcodeScanType.SCAN_TYPE_CAMERA,
+        Html5QrcodeScanType.SCAN_TYPE_FILE
+      ],
+      formatsToSupport: formatsToSupport
     },
+    false
+  );
 
-    rememberLastUsedCamera: true,
-
-    supportedScanTypes: [
-      Html5QrcodeScanType.SCAN_TYPE_CAMERA
-    ],
-
-    formatsToSupport: formatsToSupport
-  },
-  false
-);
-
-scanner.render(sendBarcode);
-
+  scanner.render(onScanSuccess, onScanFailure);
 </script>
 
 </body>
