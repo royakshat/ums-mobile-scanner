@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UMS Mobile Scanner</title>
+
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f5f7f8;
+    }
+
+    .wrap {
+      max-width: 520px;
+      margin: auto;
+    }
+
+    #reader {
+      width: 100%;
+      background: white;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .status {
+      margin-top: 15px;
+      padding: 12px;
+      background: white;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+
+<body>
+<div class="wrap">
+
+  <h2>UMS Mobile Barcode Scanner</h2>
+
+  <div id="reader"></div>
+
+  <div class="status" id="status">
+    Point the camera at a barcode.
+  </div>
+
+</div>
+
+<script>
+
+const params = new URLSearchParams(window.location.search);
+
+const sessionId = params.get("session");
+const endpoint = params.get("endpoint");
+
+let alreadySending = false;
+
+async function sendBarcode(decodedText, decodedResult) {
+
+  if (alreadySending) return;
+
+  alreadySending = true;
+
+  document.getElementById("status").innerText =
+    "Barcode detected: " + decodedText;
+
+  const format =
+    decodedResult?.result?.format?.formatName ||
+    decodedResult?.decodedResult?.format ||
+    "UNKNOWN";
+
+  const payload = {
+    action: "submitScan",
+    sessionId: sessionId,
+    barcode: decodedText,
+    format: format
+  };
+
+  try {
+
+    await fetch(endpoint, {
+      method: "POST",
+      mode: "no-cors",
+      headers: {
+        "Content-Type": "text/plain"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    document.getElementById("status").innerText =
+      "Scan sent successfully: " + decodedText;
+
+  } catch (err) {
+
+    document.getElementById("status").innerText =
+      "Unable to send scan.";
+
+    alreadySending = false;
+
+  }
+}
+
+const formatsToSupport = [
+  Html5QrcodeSupportedFormats.CODE_128,
+  Html5QrcodeSupportedFormats.CODE_39,
+  Html5QrcodeSupportedFormats.CODE_93,
+  Html5QrcodeSupportedFormats.CODABAR,
+  Html5QrcodeSupportedFormats.ITF,
+  Html5QrcodeSupportedFormats.EAN_13,
+  Html5QrcodeSupportedFormats.EAN_8,
+  Html5QrcodeSupportedFormats.UPC_A,
+  Html5QrcodeSupportedFormats.UPC_E,
+  Html5QrcodeSupportedFormats.DATA_MATRIX,
+  Html5QrcodeSupportedFormats.PDF_417,
+  Html5QrcodeSupportedFormats.AZTEC,
+  Html5QrcodeSupportedFormats.QR_CODE
+];
+
+const scanner = new Html5QrcodeScanner(
+  "reader",
+  {
+    fps: 12,
+
+    qrbox: function(viewfinderWidth, viewfinderHeight) {
+      return {
+        width: Math.floor(viewfinderWidth * 0.9),
+        height: Math.floor(viewfinderHeight * 0.45)
+      };
+    },
+
+    rememberLastUsedCamera: true,
+
+    supportedScanTypes: [
+      Html5QrcodeScanType.SCAN_TYPE_CAMERA
+    ],
+
+    formatsToSupport: formatsToSupport
+  },
+  false
+);
+
+scanner.render(sendBarcode);
+
+</script>
+
+</body>
+</html>
