@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0f766e">
   <title>UMS Mobile Scanner</title>
 
-  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@taluks/html5-qrcode@2.4.0/minified/html5-qrcode.min.js" type="text/javascript"></script>
 
   <style>
     *{box-sizing:border-box}
@@ -106,6 +106,27 @@
 
     <div class="card">
       <div id="reader"></div>
+
+      <div style="margin-top:10px">
+        <label for="barcodeFile" style="
+          display:block;
+          width:100%;
+          padding:12px 14px;
+          border-radius:10px;
+          background:#17313a;
+          color:#fff;
+          font-weight:700;
+          text-align:center;
+          cursor:pointer;">
+          Take Photo / Choose Barcode Image
+        </label>
+        <input
+          id="barcodeFile"
+          type="file"
+          accept="image/*"
+          capture="environment"
+          style="display:none">
+      </div>
     </div>
 
     <div id="statusCard" class="card ok">
@@ -117,8 +138,8 @@
 
     <div class="card hint">
       Keep the barcode flat and let the entire barcode fill most of the camera frame.
-      For long 1D medical-device labels, hold the phone parallel to the label,
-      use bright even lighting, and move closer until the bars are sharp.
+      For difficult DME/GS1 labels, use Take Photo / Choose Barcode Image — a sharp
+      full-resolution still image is often easier to decode than a live video frame.
     </div>
 
   </div>
@@ -254,12 +275,15 @@
     );
   }
 
-  const html5QrCode = new Html5Qrcode("reader", true);
+  const html5QrCode = new Html5Qrcode("reader", {
+    verbose: true,
+    useBarCodeDetectorIfSupported: false,
+    zxingWasm: { loadMode: "cdn" }
+  });
 
   const scanConfig = {
-    fps: 15,
-    aspectRatio: 1.777778,
-    disableFlip: true
+    fps: 10,
+    disableFlip: false
   };
 
   async function startScanner() {
@@ -341,6 +365,55 @@
       );
     }
   }
+
+
+  let scanFailureCount = 0;
+  const originalFailureHandler = onScanFailure;
+
+  /*
+    Still-image decoding is important for dense DME/GS1 labels.
+    It uses the same ZXing-WASM decoder but on a sharp full-resolution photo.
+  */
+  document.getElementById("barcodeFile").addEventListener("change", async function(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    setStatus(
+      "Reading barcode image...",
+      "Using full-resolution ZXing-WASM decoding.",
+      "ok"
+    );
+
+    try {
+      const result = await html5QrCode.scanFile(file, true);
+      onScanSuccess(result, { result: { format: { formatName: "Image / ZXing-WASM" } } });
+    } catch (err) {
+      console.error("Image scan failed:", err);
+      setStatus(
+        "No barcode found in image",
+        "Try moving closer so one barcode fills most of the photo, keep it sharp, and avoid glare.",
+        "warn"
+      );
+    } finally {
+      e.target.value = "";
+    }
+  });
+
+  /*
+    Surface a diagnostic after many live decode misses so we know the camera
+    is running and frames are actually reaching the decoder.
+  */
+  onScanFailure = function(error) {
+    scanFailureCount++;
+    if (scanFailureCount === 30) {
+      detailEl.textContent =
+        "Camera and decoder are active, but no barcode has matched yet. " +
+        "Try a normal UPC/Code128 first, or use Take Photo / Choose Barcode Image.";
+    }
+    if (typeof originalFailureHandler === "function") {
+      originalFailureHandler(error);
+    }
+  };
 
   startScanner();
 </script>
